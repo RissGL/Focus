@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private DispatcherTimer? _uiTimer;
     private FocusSettings _settings = new();
     private TrayIconService? _trayIcon;
+    private AgentInterface? _agentInterface;
     private bool _loading;
 
     public MainWindow()
@@ -43,6 +44,7 @@ public partial class MainWindow : Window
         ApplyTheme();
         ApplyLocale();
         SetupTrayIcon();
+        SetupAgentInterface();
 
         _uiTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _uiTimer.Tick += UpdateTimerDisplay;
@@ -71,6 +73,34 @@ public partial class MainWindow : Window
             _trayIcon = null;
             System.Windows.Application.Current.Shutdown();
         };
+    }
+
+    private void SetupAgentInterface()
+    {
+        _agentInterface = new AgentInterface(WhitelistStore.DataPath, tasks =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                foreach (var t in tasks)
+                {
+                    // Lookup ability icons for each boost
+                    foreach (var b in t.Boosts)
+                    {
+                        var ab = _abilities.FirstOrDefault(a => a.Name == b.AbilityName);
+                        if (ab != null) b.Icon = ab.Icon;
+                    }
+                    _todoList.Add(t);
+                }
+                WhitelistStore.SaveTodoList(_todoList);
+                TodoList.Items.Refresh();
+                UpdateCurrentTaskLabel();
+
+                var zh = LocaleManager.Current == Locale.ZH;
+                StatusBarText.Text = zh
+                    ? $"📥 从 Agent 导入了 {tasks.Count} 个任务"
+                    : $"📥 Imported {tasks.Count} task(s) from agent";
+            });
+        });
     }
 
     private void ShowWindow()
@@ -808,7 +838,7 @@ public partial class MainWindow : Window
         int maxPts = _abilities.Max(a => a.Points);
         if (maxPts == 0) maxPts = 1;
         // Scale up so max is visually meaningful (target: points fill the chart proportionally)
-        double scaleTarget = Math.Max(maxPts, 10); // at least 10 as "full" radius
+        double scaleTarget = Math.Max(maxPts, 30);
         var dataPoly = new Polygon
         {
             Fill = fillBrush,
@@ -1112,6 +1142,8 @@ public partial class MainWindow : Window
         _uiTimer?.Stop();
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _agentInterface?.Dispose();
+        _agentInterface = null;
         base.OnClosing(e);
     }
 }

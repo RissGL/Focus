@@ -18,6 +18,9 @@
 - **成就系统** — 10 种成就徽章：首次专注、连续天数、累计次数、累计时长
 - **等级系统** — 7 个等级（新手→传奇），根据总专注时长升级
 - **深色模式** — 一键切换深色/浅色主题
+- **能力坐标** — 雷达图展示各项能力的成长（编程、学习、运动等），完成任务自动加点
+- **Agent 接口** — 支持 Claude Code 等 AI Agent 通过 JSON 文件添加任务/制定计划（见下方说明）
+- **任务编辑器** — 独立编辑窗口，设置任务类型、名称、完成时获得的能力点数
 
 ## 默认白名单
 
@@ -87,10 +90,50 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 - `url_whitelist.json` — 网址白名单
 - `todos.json` — 任务列表
 - `todos_archive.json` — 已归档任务
+- `abilities.json` — 能力属性配置
+- `agent_inbox.json` — Agent 任务导入（监控文件）
+- `agent_outbox.json` — Agent 导入结果反馈
 - `locale.txt` — 语言偏好
 
 卸载时手动删除该目录即可清除所有数据。不会修改注册表或系统文件。
 
+## Agent 接口（Claude Code 集成）
 
+Focus 支持 AI Agent 通过 JSON 文件添加任务。只需写入 `%LocalAppData%\FocusApp\agent_inbox.json`，应用会自动检测并导入。
 
-本项目由vibe coding完成
+### 格式
+
+```json
+{
+  "tasks": [
+    {
+      "text": "任务名称",
+      "type": "daily",
+      "points": { "Programming": 2, "Learning": 1 }
+    }
+  ]
+}
+```
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `text` | ✅ | 任务名称 |
+| `type` | ❌ | `"short"` / `"daily"` / `"long"`，默认 short |
+| `points` | ❌ | 能力名→点数映射，能力名需与 App 中已创建的一致 |
+
+### 使用示例
+
+对 Claude Code 说「给 Focus 加一个每日任务：写周报，编程+1」即可。或者在终端执行：
+
+```bash
+# Windows (Git Bash)
+cat > "$LOCALAPPDATA/FocusApp/agent_inbox.json" << 'EOF'
+{"tasks":[{"text":"写周报","type":"daily","points":{"Programming":1}}]}
+EOF
+```
+
+导入结果会写入同目录的 `agent_outbox.json`。
+
+---
+
+本项目由 vibe coding 完成 🍃
