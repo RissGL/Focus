@@ -9,10 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Resource Include="gemini-svg.png" />
     <None Update="gemini-svg.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="gemini-svg.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
