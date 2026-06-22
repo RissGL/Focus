@@ -17,13 +17,6 @@ using WpfApp1.Views;
 
 namespace WpfApp1;
 
-public class BoostSelectorItem
-{
-    public string Name { get; set; } = "";
-    public string Icon { get; set; } = "";
-    public int BoostPoints { get; set; }
-}
-
 public partial class MainWindow : Window
 {
     private ObservableCollection<AppWhitelistEntry> _appWhitelist = new();
@@ -31,8 +24,6 @@ public partial class MainWindow : Window
     private ObservableCollection<TodoItem> _todoList = new();
     private ObservableCollection<TodoItem> _archivedTasks = new();
     private ObservableCollection<Ability> _abilities = new();
-    private ObservableCollection<BoostSelectorItem> _boostItems = new();
-    private TodoType _taskType = TodoType.ShortTerm;
     private FocusSessionManager? _session;
     private DispatcherTimer? _uiTimer;
     private FocusSettings _settings = new();
@@ -264,9 +255,6 @@ public partial class MainWindow : Window
 
         // Archive button
         UpdateArchiveButton();
-
-        // Task type buttons
-        UpdateTaskTypeButtons();
 
         // Current task label refresh
         UpdateCurrentTaskLabel();
@@ -616,89 +604,41 @@ public partial class MainWindow : Window
 
     private void AddTaskBtn_Click(object sender, RoutedEventArgs e)
     {
-        AddTask();
+        OpenTaskEditor(null);
     }
 
-    private void NewTaskBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private void EditTaskBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (e.Key == System.Windows.Input.Key.Enter)
-            AddTask();
-    }
-
-    private void AddTask()
-    {
-        var text = NewTaskBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(text)) return;
-
-        var today = DateTime.Today.ToString("yyyy-MM-dd");
-        var boosts = _boostItems
-            .Where(b => b.BoostPoints > 0)
-            .Select(b => new AbilityBoost { AbilityName = b.Name, Points = b.BoostPoints })
-            .ToList();
-
-        _todoList.Add(new TodoItem
+        if (sender is Button btn && btn.Tag is TodoItem item)
         {
-            Text = text,
-            Type = _taskType,
-            LastResetDate = today,
-            Boosts = boosts
-        });
-        WhitelistStore.SaveTodoList(_todoList);
-        TodoList.Items.Refresh();
-
-        // Reset boost selections
-        _boostItems.Clear();
-        BoostSelector.Visibility = Visibility.Collapsed;
-        UpdateTaskTypeButtons();
-
-        NewTaskBox.Text = "";
-        UpdateCurrentTaskLabel();
+            var index = _todoList.IndexOf(item);
+            OpenTaskEditor(item, index);
+        }
     }
 
-    private void TaskTypeBtn_Click(object sender, RoutedEventArgs e)
+    private void OpenTaskEditor(TodoItem? existing, int index = -1)
     {
-        if (sender is Button btn && btn.Tag is string tag)
+        var editor = new TaskEditorWindow(_abilities, existing, _settings.IsDarkMode);
+        editor.Owner = this;
+        if (editor.ShowDialog() == true && editor.Result != null)
         {
-            _taskType = tag switch
+            var result = editor.Result;
+            if (existing != null)
             {
-                "Daily" => TodoType.Daily,
-                "LongTerm" => TodoType.LongTerm,
-                _ => TodoType.ShortTerm
-            };
-            UpdateTaskTypeButtons();
-        }
-    }
-
-    private void BoostToggleBtn_Click(object sender, RoutedEventArgs e)
-    {
-        var visible = BoostSelector.Visibility == Visibility.Visible;
-        BoostSelector.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
-        if (!visible)
-        {
-            _boostItems.Clear();
-            foreach (var ab in _abilities)
-                _boostItems.Add(new BoostSelectorItem { Name = ab.Name, Icon = ab.Icon });
-            BoostSelector.ItemsSource = _boostItems;
-        }
-    }
-
-    private void BoostPlusBtn_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is BoostSelectorItem item)
-        {
-            item.BoostPoints++;
-            BoostSelector.ItemsSource = null;
-            BoostSelector.ItemsSource = _boostItems;
-        }
-    }
-
-    private void BoostMinusBtn_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is BoostSelectorItem item)
-        {
-            if (item.BoostPoints > 0) item.BoostPoints--;
-            BoostSelector.ItemsSource = null;
-            BoostSelector.ItemsSource = _boostItems;
+                // Update existing task in place
+                existing.Text = result.Text;
+                existing.Type = result.Type;
+                existing.Boosts = result.Boosts;
+                WhitelistStore.SaveTodoList(_todoList);
+                TodoList.Items.Refresh();
+            }
+            else
+            {
+                _todoList.Add(result);
+                WhitelistStore.SaveTodoList(_todoList);
+                TodoList.Items.Refresh();
+            }
+            UpdateCurrentTaskLabel();
         }
     }
 
@@ -739,30 +679,6 @@ public partial class MainWindow : Window
                 DrawRadarChart();
             }
         }
-    }
-
-    private void UpdateTaskTypeButtons()
-    {
-        var zh = LocaleManager.Current == Locale.ZH;
-        var activeBrush = new SolidColorBrush(Color.FromRgb(99, 102, 241));
-        var inactiveBrush = new SolidColorBrush(Color.FromRgb(229, 231, 235));
-        var whiteBrush = new SolidColorBrush(Colors.White);
-        var textBrush = new SolidColorBrush(Color.FromRgb(107, 114, 128));
-
-        void StyleBtn(Button btn, bool active)
-        {
-            btn.Background = active ? activeBrush : inactiveBrush;
-            btn.Foreground = active ? whiteBrush : textBrush;
-            btn.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
-        }
-
-        StyleBtn(ShortTermBtn, _taskType == TodoType.ShortTerm);
-        StyleBtn(DailyBtn, _taskType == TodoType.Daily);
-        StyleBtn(LongTermBtn, _taskType == TodoType.LongTerm);
-
-        ShortTermBtn.Content = zh ? "短期" : "Short";
-        DailyBtn.Content = (zh ? "🔄 每日" : "🔄 Daily");
-        LongTermBtn.Content = (zh ? "🎯 长期" : "🎯 Long");
     }
 
     private void FinishTaskBtn_Click(object sender, RoutedEventArgs e)

@@ -275,94 +275,25 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Style="{StaticResource SectionTitle}"
-                                   x:Name="TodoTitle" Text="Tasks"/>
-
-                        <!-- Input row: textbox + type selector + add button -->
-                        <Grid Grid.Row="1" Margin="0,0,0,8">
+                        <!-- Header row: title + Add button -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <StackPanel Grid.Row="0" Orientation="Horizontal">
-                                <TextBox x:Name="NewTaskBox" FontSize="12" Padding="8,6"
-                                         Width="200" VerticalContentAlignment="Center"
-                                         KeyDown="NewTaskBox_KeyDown"/>
-                                <Button x:Name="AddTaskBtn" Content="+ Add" Style="{StaticResource SecondaryBtn}"
-                                        Click="AddTaskBtn_Click"
-                                        FontSize="12" Padding="10,6" Margin="6,0,0,0"/>
-                            </StackPanel>
-
-                            <!-- Type selector -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,4,0,0">
-                                <Button x:Name="ShortTermBtn" Content="Short" Tag="ShortTerm"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Click="TaskTypeBtn_Click"
-                                        FontSize="10" Padding="6,3" Margin="0,0,3,0"/>
-                                <Button x:Name="DailyBtn" Content="🔄 Daily" Tag="Daily"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Click="TaskTypeBtn_Click"
-                                        FontSize="10" Padding="6,3" Margin="0,0,3,0"/>
-                                <Button x:Name="LongTermBtn" Content="🎯 Long" Tag="LongTerm"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Click="TaskTypeBtn_Click"
-                                        FontSize="10" Padding="6,3"/>
-                                <Button x:Name="BoostToggleBtn" Content="⚡ Boost" Tag="Boost"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Click="BoostToggleBtn_Click"
-                                        FontSize="10" Padding="6,3" Margin="6,0,0,0"/>
-                            </StackPanel>
-
-                            <!-- Boost assignment (collapsible) -->
-                            <ItemsControl x:Name="BoostSelector" Grid.Row="2"
-                                          Visibility="Collapsed" Margin="0,4,0,0">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,0,0,2">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding Icon}"
-                                                       FontSize="11" VerticalAlignment="Center"
-                                                       Margin="0,0,4,0"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}"
-                                                       FontSize="11" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextSecondary}"/>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                <Button Content="-" Style="{StaticResource SecondaryBtn}"
-                                                        FontSize="9" Padding="4,1"
-                                                        Click="BoostMinusBtn_Click"
-                                                        Tag="{Binding}"/>
-                                                <TextBlock Text="{Binding BoostPoints}"
-                                                           FontSize="11" FontWeight="SemiBold"
-                                                           Width="16" TextAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{StaticResource PrimaryColor}"/>
-                                                <Button Content="+" Style="{StaticResource SecondaryBtn}"
-                                                        FontSize="9" Padding="4,1"
-                                                        Click="BoostPlusBtn_Click"
-                                                        Tag="{Binding}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <TextBlock Grid.Column="0" Style="{StaticResource SectionTitle}"
+                                       x:Name="TodoTitle" Text="Tasks" Margin="0,0,0,0"/>
+                            <Button Grid.Column="1" x:Name="AddTaskBtn" Content="+ Add Task"
+                                    Style="{StaticResource PrimaryBtn}"
+                                    Click="AddTaskBtn_Click"
+                                    FontSize="12" Padding="12,6"/>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="TodoList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -373,6 +304,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
@@ -401,9 +333,9 @@
                                                         </TextBlock.Style>
                                                     </TextBlock>
                                                 </StackPanel>
-                                                <!-- Boost badges -->
+                                                <!-- Ability point badges -->
                                                 <ItemsControl Grid.Column="3" ItemsSource="{Binding Boosts}"
-                                                              VerticalAlignment="Center" Margin="4,0,0,0">
+                                                              VerticalAlignment="Center" Margin="3,0,0,0">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
                                                             <StackPanel Orientation="Horizontal"/>
@@ -413,16 +345,26 @@
                                                         <DataTemplate>
                                                             <Border Background="#EEF2FF" CornerRadius="3"
                                                                     Padding="3,1" Margin="0,0,3,0">
-                                                                <TextBlock FontSize="9" Foreground="#4F46E5"
-                                                                           Text="{Binding Points, StringFormat='+{0}'}"/>
+                                                                <TextBlock FontSize="9" Foreground="#4F46E5">
+                                                                    <Run Text="{Binding Icon, Mode=OneWay}"/>
+                                                                    <Run Text="{Binding Points, StringFormat='+{0}', Mode=OneWay}"/>
+                                                                </TextBlock>
                                                             </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
-                                                <!-- Finish button (LongTerm only) -->
-                                                <Button Grid.Column="4" Content="✓ Done"
-                                                        FontSize="9" Padding="5,2"
+                                                <!-- Edit button -->
+                                                <Button Grid.Column="4" Content="✎"
+                                                        Style="{StaticResource SecondaryBtn}"
+                                                        FontSize="10" Padding="4,2"
                                                         Margin="4,0,0,0"
+                                                        Click="EditTaskBtn_Click"
+                                                        Tag="{Binding}"
+                                                        ToolTip="Edit task"/>
+                                                <!-- Finish button (LongTerm only) -->
+                                                <Button Grid.Column="5" Content="✓ Done"
+                                                        FontSize="9" Padding="5,2"
+                                                        Margin="2,0,0,0"
                                                         Click="FinishTaskBtn_Click"
                                                         Tag="{Binding}"
                                                         ToolTip="Permanently finish this long-term task">
@@ -442,10 +384,10 @@
                                                         </Style>
                                                     </Button.Style>
                                                 </Button>
-                                                <Button Grid.Column="5" Content="✕"
+                                                <Button Grid.Column="6" Content="✕"
                                                         Style="{StaticResource SecondaryBtn}"
                                                         FontSize="10" Padding="4,2"
-                                                        Margin="4,0,0,0"
+                                                        Margin="2,0,0,0"
                                                         Click="DeleteTaskBtn_Click"
                                                         Tag="{Binding}" ToolTip="Delete task"/>
                                             </Grid>
@@ -456,7 +398,7 @@
                         </ScrollViewer>
 
                         <!-- Archive toggle + list -->
-                        <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="2" Margin="0,8,0,0">
                             <Button x:Name="ArchiveToggleBtn" Content="Archive (0)"
                                     Style="{StaticResource SecondaryBtn}"
                                     Click="ArchiveToggleBtn_Click"
