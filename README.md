@@ -21,23 +21,23 @@
 
 ## 默认白名单
 
-| 应用 | 进程名 |
-|------|--------|
-| Visual Studio | devenv |
-| VS Code | Code |
-| Microsoft Edge | msedge |
-| Google Chrome | chrome |
-| Notepad | Notepad |
-| File Explorer | explorer |
+| 应用               | 进程名                  |
+| ---------------- | -------------------- |
+| Visual Studio    | devenv               |
+| VS Code          | Code                 |
+| Microsoft Edge   | msedge               |
+| Google Chrome    | chrome               |
+| Notepad          | Notepad              |
+| File Explorer    | explorer             |
 | Windows Terminal | wt / WindowsTerminal |
-| Focus App（自身） | WpfApp1 |
+| Focus App（自身）    | WpfApp1              |
 
-| 网址 | 说明 |
-|------|------|
-| github.com | GitHub |
-| stackoverflow.com | Stack Overflow |
-| learn.microsoft.com | Microsoft Learn |
-| bilibili.com/video/BV | Bilibili BV号视频 |
+| 网址                    | 说明              |
+| --------------------- | --------------- |
+| github.com            | GitHub          |
+| stackoverflow.com     | Stack Overflow  |
+| learn.microsoft.com   | Microsoft Learn |
+| bilibili.com/video/BV | Bilibili BV号视频  |
 
 ## 构建
 
@@ -90,3 +90,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 - `locale.txt` — 语言偏好
 
 卸载时手动删除该目录即可清除所有数据。不会修改注册表或系统文件。
+
+
+
+本项目由vibe coding完成

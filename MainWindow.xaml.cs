@@ -3,11 +3,13 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using PathIO = System.IO.Path;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using WpfApp1.Models;
 using WpfApp1.Services;
@@ -21,6 +23,7 @@ public partial class MainWindow : Window
     private ObservableCollection<UrlWhitelistEntry> _urlWhitelist = new();
     private ObservableCollection<TodoItem> _todoList = new();
     private ObservableCollection<TodoItem> _archivedTasks = new();
+    private ObservableCollection<Ability> _abilities = new();
     private TodoType _taskType = TodoType.ShortTerm;
     private FocusSessionManager? _session;
     private DispatcherTimer? _uiTimer;
@@ -51,7 +54,7 @@ public partial class MainWindow : Window
 
     private void SetupTrayIcon()
     {
-        var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "gemini-svg.ico");
+        var iconPath = PathIO.Combine(AppDomain.CurrentDomain.BaseDirectory, "gemini-svg.ico");
         _trayIcon = new TrayIconService(this, iconPath,
             LocaleManager.Current == Locale.ZH ? "显示窗口" : "Show",
             LocaleManager.Current == Locale.ZH ? "停止专注" : "Stop Focus",
@@ -115,6 +118,7 @@ public partial class MainWindow : Window
         _urlWhitelist = WhitelistStore.LoadUrlWhitelist();
         _todoList = WhitelistStore.LoadTodoList();
         _archivedTasks = WhitelistStore.LoadArchive();
+        _abilities = WhitelistStore.LoadAbilities();
         _settings = WhitelistStore.LoadSettings();
 
         DurationSlider.Value = _settings.FocusDurationMinutes;
@@ -138,6 +142,8 @@ public partial class MainWindow : Window
         UrlWhitelistList.ItemsSource = _urlWhitelist;
         TodoList.ItemsSource = _todoList;
         ArchiveList.ItemsSource = _archivedTasks;
+        AbilityList.ItemsSource = _abilities;
+        DrawRadarChart();
     }
 
     private void UpdateTimerDisplay(object? sender, EventArgs e)
@@ -232,6 +238,8 @@ public partial class MainWindow : Window
         AppWhitelistTitle.Text = L("Whitelist.Apps");
         UrlWhitelistTitle.Text = L("Whitelist.Urls");
         TodoTitle.Text = L("Todo.Title");
+        RadarTitle.Text = L("Radar.Title");
+        AbilityEditorTitle.Text = L("Abilities.Title");
         SettingsTitle.Text = "Settings"; // not localized, neutral for now
 
         // Settings
@@ -682,12 +690,37 @@ public partial class MainWindow : Window
 
     private void TaskCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        // Archive completed short-term tasks
-        var toArchive = _todoList.Where(t => t.Type == TodoType.ShortTerm && t.IsCompleted).ToList();
-        foreach (var item in toArchive)
+        if (sender is not CheckBox cb || cb.DataContext is not TodoItem task) return;
+        if (!task.IsCompleted) return; // only handle check→complete, not uncheck
+
+        // Show points dialog
+        var result = ShowPointsDialog(task);
+        if (result == null)
         {
-            _todoList.Remove(item);
-            _archivedTasks.Insert(0, item);
+            // User cancelled — undo the check
+            task.IsCompleted = false;
+            cb.IsChecked = false;
+            return;
+        }
+
+        // Apply points to abilities
+        foreach (var (ability, pts) in result)
+        {
+            if (pts > 0)
+            {
+                var ab = _abilities.FirstOrDefault(a => a.Name == ability.Name);
+                if (ab != null) ab.Points += pts;
+            }
+        }
+        WhitelistStore.SaveAbilities(_abilities);
+        AbilityList.Items.Refresh();
+        DrawRadarChart();
+
+        // Archive completed short-term tasks
+        if (task.Type == TodoType.ShortTerm)
+        {
+            _todoList.Remove(task);
+            _archivedTasks.Insert(0, task);
         }
 
         WhitelistStore.SaveTodoList(_todoList);
@@ -706,6 +739,295 @@ public partial class MainWindow : Window
             WhitelistStore.SaveTodoList(_todoList);
             TodoList.Items.Refresh();
             UpdateCurrentTaskLabel();
+        }
+    }
+
+    private void DrawRadarChart()
+    {
+        var canvas = RadarCanvas;
+        canvas.Children.Clear();
+        int n = _abilities.Count;
+        if (n < 3) return;
+
+        double cx = 100, cy = 100, r = 90;
+        var dark = _settings.IsDarkMode;
+        var gridStroke = ParseColor(dark ? "#4B5563" : "#D1D5DB");
+        var axisStroke = ParseColor(dark ? "#6B7280" : "#9CA3AF");
+        var fillBrush = new SolidColorBrush(ParseColor("#6366F1")) { Opacity = 0.25 };
+        var strokeBrush = new SolidColorBrush(ParseColor("#6366F1"));
+        var labelFg = dark ? Color.FromRgb(209, 213, 219) : Color.FromRgb(55, 65, 81);
+
+        // Concentric grid
+        for (int level = 1; level <= 4; level++)
+        {
+            var poly = new Polygon
+            {
+                Stroke = new SolidColorBrush(gridStroke),
+                StrokeThickness = 0.5,
+                StrokeDashArray = new DoubleCollection { 3, 2 }
+            };
+            double lr = r * level / 4;
+            for (int i = 0; i < n; i++)
+            {
+                double angle = -Math.PI / 2 + 2 * Math.PI * i / n;
+                poly.Points.Add(new Point(cx + lr * Math.Cos(angle), cy + lr * Math.Sin(angle)));
+            }
+            canvas.Children.Add(poly);
+        }
+
+        // Axis lines
+        for (int i = 0; i < n; i++)
+        {
+            double angle = -Math.PI / 2 + 2 * Math.PI * i / n;
+            double ex = cx + r * Math.Cos(angle), ey = cy + r * Math.Sin(angle);
+            var line = new System.Windows.Shapes.Line
+            {
+                X1 = cx, Y1 = cy, X2 = ex, Y2 = ey,
+                Stroke = new SolidColorBrush(axisStroke),
+                StrokeThickness = 0.8
+            };
+            canvas.Children.Add(line);
+
+            // Label
+            var ab = _abilities[i];
+            double lx = cx + (r + 18) * Math.Cos(angle) - 20;
+            double ly = cy + (r + 18) * Math.Sin(angle) - 8;
+            var lbl = new TextBlock
+            {
+                Text = $"{ab.Icon} {ab.Name}\n{ab.Points}",
+                FontSize = 9,
+                Foreground = new SolidColorBrush(labelFg),
+                TextAlignment = TextAlignment.Center,
+                Width = 45,
+                Height = 24
+            };
+            Canvas.SetLeft(lbl, lx);
+            Canvas.SetTop(lbl, ly);
+            canvas.Children.Add(lbl);
+        }
+
+        // Data polygon
+        int maxPts = _abilities.Max(a => a.Points);
+        if (maxPts == 0) maxPts = 1;
+        // Scale up so max is visually meaningful (target: points fill the chart proportionally)
+        double scaleTarget = Math.Max(maxPts, 10); // at least 10 as "full" radius
+        var dataPoly = new Polygon
+        {
+            Fill = fillBrush,
+            Stroke = strokeBrush,
+            StrokeThickness = 2
+        };
+        for (int i = 0; i < n; i++)
+        {
+            double frac = Math.Min(_abilities[i].Points / scaleTarget, 1.0);
+            double angle = -Math.PI / 2 + 2 * Math.PI * i / n;
+            dataPoly.Points.Add(new Point(cx + r * frac * Math.Cos(angle), cy + r * frac * Math.Sin(angle)));
+        }
+        canvas.Children.Add(dataPoly);
+
+        // Data points (dots)
+        for (int i = 0; i < n; i++)
+        {
+            double frac = Math.Min(_abilities[i].Points / scaleTarget, 1.0);
+            double angle = -Math.PI / 2 + 2 * Math.PI * i / n;
+            double px = cx + r * frac * Math.Cos(angle), py = cy + r * frac * Math.Sin(angle);
+            var dot = new System.Windows.Shapes.Ellipse
+            {
+                Width = 6, Height = 6,
+                Fill = strokeBrush,
+                Stroke = Brushes.White,
+                StrokeThickness = 1.5
+            };
+            Canvas.SetLeft(dot, px - 3);
+            Canvas.SetTop(dot, py - 3);
+            canvas.Children.Add(dot);
+        }
+    }
+
+    private List<(Ability ability, int points)>? ShowPointsDialog(TodoItem task)
+    {
+        if (_abilities.Count == 0) return new List<(Ability, int)>();
+
+        var zh = LocaleManager.Current == Locale.ZH;
+        var dialog = new Window
+        {
+            Title = zh ? "任务完成！分配属性点" : "Task Complete! Assign Points",
+            Width = 380,
+            Height = 280 + _abilities.Count * 36,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStyle = WindowStyle.ToolWindow,
+            ShowInTaskbar = false,
+            Background = _settings.IsDarkMode
+                ? new SolidColorBrush(ParseColor("#1F2937"))
+                : new SolidColorBrush(ParseColor("#FFFFFF"))
+        };
+
+        var grid = new Grid { Margin = new Thickness(16) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var taskLabel = new TextBlock
+        {
+            Text = (zh ? "完成任务：" : "Task: ") + task.Text,
+            FontSize = 14, FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 6),
+            Foreground = new SolidColorBrush(ParseColor(_settings.IsDarkMode ? "#F9FAFB" : "#1F2937"))
+        };
+        Grid.SetRow(taskLabel, 0);
+        grid.Children.Add(taskLabel);
+
+        var hintLabel = new TextBlock
+        {
+            Text = zh ? "选择要提升的属性：" : "Select abilities to improve:",
+            FontSize = 12, Margin = new Thickness(0, 0, 0, 10),
+            Foreground = new SolidColorBrush(ParseColor(_settings.IsDarkMode ? "#9CA3AF" : "#6B7280"))
+        };
+        Grid.SetRow(hintLabel, 1);
+        grid.Children.Add(hintLabel);
+
+        // Ability rows with slider/buttons
+        var abilitiesPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var pointSelectors = new Dictionary<Ability, Slider>();
+        var pointLabels = new Dictionary<Ability, TextBlock>();
+
+        foreach (var ab in _abilities)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+
+            var nameLabel = new TextBlock
+            {
+                Text = $"{ab.Icon} {ab.Name}",
+                FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(ParseColor(_settings.IsDarkMode ? "#F9FAFB" : "#1F2937"))
+            };
+            Grid.SetColumn(nameLabel, 0);
+            row.Children.Add(nameLabel);
+
+            var slider = new Slider
+            {
+                Minimum = 0, Maximum = 5, Value = 0,
+                TickFrequency = 1, IsSnapToTickEnabled = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0)
+            };
+            Grid.SetColumn(slider, 1);
+            row.Children.Add(slider);
+
+            var valLabel = new TextBlock
+            {
+                Text = "0", FontSize = 13, FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = new SolidColorBrush(ParseColor("#6366F1"))
+            };
+            Grid.SetColumn(valLabel, 2);
+            row.Children.Add(valLabel);
+
+            slider.ValueChanged += (_, _) =>
+            {
+                valLabel.Text = ((int)slider.Value).ToString();
+            };
+
+            pointSelectors[ab] = slider;
+            pointLabels[ab] = valLabel;
+            abilitiesPanel.Children.Add(row);
+        }
+        Grid.SetRow(abilitiesPanel, 2);
+        grid.Children.Add(abilitiesPanel);
+
+        // Buttons
+        var btnPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        Grid.SetRow(btnPanel, 3);
+
+        var skipBtn = new Button
+        {
+            Content = zh ? "跳过" : "Skip",
+            Padding = new Thickness(16, 6, 16, 6),
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        skipBtn.Click += (_, _) => { dialog.DialogResult = true; dialog.Tag = "skip"; dialog.Close(); };
+        btnPanel.Children.Add(skipBtn);
+
+        var okBtn = new Button
+        {
+            Content = zh ? "✓ 确认" : "✓ Confirm",
+            Padding = new Thickness(16, 6, 16, 6),
+            Background = new SolidColorBrush(ParseColor("#6366F1")),
+            Foreground = Brushes.White,
+            FontWeight = FontWeights.SemiBold,
+            BorderThickness = new Thickness(0)
+        };
+        okBtn.Click += (_, _) => { dialog.DialogResult = true; dialog.Tag = "ok"; dialog.Close(); };
+        btnPanel.Children.Add(okBtn);
+
+        grid.Children.Add(btnPanel);
+        dialog.Content = grid;
+
+        if (dialog.ShowDialog() != true || dialog.Tag as string != "ok")
+            return null;
+
+        // Collect results
+        var results = new List<(Ability, int)>();
+        foreach (var ab in _abilities)
+        {
+            int pts = (int)(pointSelectors[ab]?.Value ?? 0);
+            if (pts > 0) results.Add((ab, pts));
+        }
+        return results;
+    }
+
+    private void NewAbilityBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter) AddAbility();
+    }
+
+    private void AddAbilityBtn_Click(object sender, RoutedEventArgs e) => AddAbility();
+
+    private void AddAbility()
+    {
+        var text = NewAbilityBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var colors = new[] { "#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4" };
+        var color = colors[_abilities.Count % colors.Length];
+
+        _abilities.Add(new Ability { Name = text, Icon = "⭐", Color = color });
+        WhitelistStore.SaveAbilities(_abilities);
+        AbilityList.Items.Refresh();
+        DrawRadarChart();
+        NewAbilityBox.Text = "";
+    }
+
+    private void AbilityAddPointBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is Ability ab)
+        {
+            ab.Points++;
+            WhitelistStore.SaveAbilities(_abilities);
+            AbilityList.Items.Refresh();
+            DrawRadarChart();
+        }
+    }
+
+    private void DeleteAbilityBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is Ability ab)
+        {
+            _abilities.Remove(ab);
+            WhitelistStore.SaveAbilities(_abilities);
+            AbilityList.Items.Refresh();
+            DrawRadarChart();
         }
     }
 
@@ -745,6 +1067,8 @@ public partial class MainWindow : Window
         Resources["TextPrimary"] = new SolidColorBrush(ParseColor(dark ? "#F9FAFB" : "#1F2937"));
         Resources["TextSecondary"] = new SolidColorBrush(ParseColor(dark ? "#9CA3AF" : "#6B7280"));
         Resources["BorderColor"] = new SolidColorBrush(ParseColor(dark ? "#374151" : "#E5E7EB"));
+
+        DrawRadarChart();
     }
 
     private static Color ParseColor(string hex) =>
@@ -817,7 +1141,7 @@ public partial class MainWindow : Window
 
         var exePath = System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe");
         var startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-        var startupLink = Path.Combine(startupFolder, "Focus Mode.lnk");
+        var startupLink = PathIO.Combine(startupFolder, "Focus Mode.lnk");
 
         if (autoStart)
         {
@@ -840,9 +1164,9 @@ public partial class MainWindow : Window
             dynamic shortcut = shell.GetType().InvokeMember("CreateShortcut",
                 System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { linkPath })!;
             shortcut.TargetPath = exePath;
-            shortcut.WorkingDirectory = Path.GetDirectoryName(exePath);
+            shortcut.WorkingDirectory = PathIO.GetDirectoryName(exePath);
             shortcut.Description = "Focus Mode";
-            shortcut.IconLocation = Path.Combine(Path.GetDirectoryName(exePath) ?? "", "gemini-svg.ico") + ",0";
+            shortcut.IconLocation = PathIO.Combine(PathIO.GetDirectoryName(exePath) ?? "", "gemini-svg.ico") + ",0";
             shortcut.Save();
         }
         catch { }

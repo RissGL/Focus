@@ -17,6 +17,7 @@ public class WhitelistStore
     private static readonly string LocaleFile = Path.Combine(DataFolder, "locale.txt");
     private static readonly string TodoFile = Path.Combine(DataFolder, "todos.json");
     private static readonly string ArchiveFile = Path.Combine(DataFolder, "todos_archive.json");
+    private static readonly string AbilitiesFile = Path.Combine(DataFolder, "abilities.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -97,6 +98,28 @@ public class WhitelistStore
     public static void SaveArchive(ObservableCollection<TodoItem> archived)
     {
         SaveList(ArchiveFile, archived);
+    }
+
+    public static ObservableCollection<Ability> LoadAbilities()
+    {
+        return LoadList<Ability>(AbilitiesFile) ?? GetDefaultAbilities();
+    }
+
+    public static void SaveAbilities(ObservableCollection<Ability> abilities)
+    {
+        SaveList(AbilitiesFile, abilities);
+    }
+
+    private static ObservableCollection<Ability> GetDefaultAbilities()
+    {
+        return new ObservableCollection<Ability>
+        {
+            new() { Name = "Programming", Icon = "💻", Color = "#6366F1" },
+            new() { Name = "Learning",    Icon = "📚", Color = "#10B981" },
+            new() { Name = "Exercise",    Icon = "🏃", Color = "#F59E0B" },
+            new() { Name = "Creation",    Icon = "🎨", Color = "#EF4444" },
+            new() { Name = "Social",      Icon = "💬", Color = "#8B5CF6" },
+        };
     }
 
     public static void SaveSettings(FocusSettings settings)

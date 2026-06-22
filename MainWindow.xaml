@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Focus Mode"
-        Height="620" Width="900"
-        MinHeight="500" MinWidth="750"
+        Height="640" Width="1120"
+        MinHeight="540" MinWidth="950"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBg}">
 
@@ -186,7 +186,8 @@
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="340"/>
+                <ColumnDefinition Width="240"/>
+                <ColumnDefinition Width="310"/>
             </Grid.ColumnDefinitions>
 
             <!-- Left: Whitelist + Todo -->
@@ -424,8 +425,91 @@
                 </Border>
             </Grid>
 
-            <!-- Right: URL whitelist + Controls -->
+            <!-- Middle: Radar Chart + Abilities -->
             <Grid Grid.Column="1" Margin="8,0,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Radar Chart Card -->
+                <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="0,0,0,4">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}"
+                                   x:Name="RadarTitle" Text="Stats" Margin="0,0,0,8"/>
+                        <Canvas x:Name="RadarCanvas" Width="200" Height="200"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Ability Editor Card -->
+                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,4,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Style="{StaticResource SectionTitle}"
+                                   x:Name="AbilityEditorTitle" Text="Abilities" Margin="0,0,0,6"/>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBox x:Name="NewAbilityBox" FontSize="11" Padding="6,4"
+                                     Width="100" VerticalContentAlignment="Center"
+                                     KeyDown="NewAbilityBox_KeyDown"/>
+                            <Button Content="+ Add" Style="{StaticResource SecondaryBtn}"
+                                    Click="AddAbilityBtn_Click"
+                                    FontSize="11" Padding="8,4" Margin="4,0,0,0"/>
+                        </StackPanel>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="AbilityList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="5,3" Margin="0,0,0,2"
+                                                Background="{DynamicResource ItemBg}" CornerRadius="4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Icon}"
+                                                           FontSize="12" VerticalAlignment="Center"
+                                                           Margin="0,0,4,0"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontSize="12"
+                                                               Foreground="{DynamicResource TextPrimary}"/>
+                                                    <TextBlock FontSize="10"
+                                                               Foreground="{DynamicResource TextSecondary}">
+                                                        <Run Text="{Binding Points, StringFormat='{}Points: {0}'}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <Button Grid.Column="2" Content="+"
+                                                        Style="{StaticResource SecondaryBtn}"
+                                                        FontSize="9" Padding="4,1"
+                                                        Click="AbilityAddPointBtn_Click"
+                                                        Tag="{Binding}"/>
+                                                <Button Grid.Column="3" Content="✕"
+                                                        Style="{StaticResource SecondaryBtn}"
+                                                        FontSize="9" Padding="4,1"
+                                                        Margin="2,0,0,0"
+                                                        Click="DeleteAbilityBtn_Click"
+                                                        Tag="{Binding}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Right: URL whitelist + Controls -->
+            <Grid Grid.Column="2" Margin="8,0,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
