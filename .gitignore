@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Visual Studio
+.vs/
+*.sln.ide/
+*.dbmdl
+*.jfm
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## Windows
+Thumbs.db
+Desktop.ini
+
+## Temporary files
+*.tmp
+*.swp
+*.log
