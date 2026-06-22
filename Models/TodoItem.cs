@@ -10,6 +10,7 @@ public class TodoItem
     public bool IsFinished { get; set; } // LongTerm: permanently done
     public string LastResetDate { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public List<AbilityBoost> Boosts { get; set; } = new();
 
     // Display helpers
     public string TypeIcon => Type switch

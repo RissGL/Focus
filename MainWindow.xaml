@@ -5,7 +5,7 @@
         Height="640" Width="1120"
         MinHeight="540" MinWidth="950"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource WindowBg}">
+        Background="{DynamicResource WindowBg}" Icon="/gemini-svg.png">
 
     <Window.Resources>
         <!-- Colors -->
@@ -97,6 +97,10 @@
     </Window.Resources>
 
     <Grid Margin="24">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="89*"/>
+            <ColumnDefinition Width="179*"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -104,7 +108,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+        <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="0,0,0,16" Grid.ColumnSpan="2">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -183,7 +187,7 @@
         </Border>
 
         <!-- Main content -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,45" Grid.RowSpan="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="240"/>
@@ -288,6 +292,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Orientation="Horizontal">
@@ -313,7 +318,48 @@
                                         Style="{StaticResource SecondaryBtn}"
                                         Click="TaskTypeBtn_Click"
                                         FontSize="10" Padding="6,3"/>
+                                <Button x:Name="BoostToggleBtn" Content="⚡ Boost" Tag="Boost"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        Click="BoostToggleBtn_Click"
+                                        FontSize="10" Padding="6,3" Margin="6,0,0,0"/>
                             </StackPanel>
+
+                            <!-- Boost assignment (collapsible) -->
+                            <ItemsControl x:Name="BoostSelector" Grid.Row="2"
+                                          Visibility="Collapsed" Margin="0,4,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Icon}"
+                                                       FontSize="11" VerticalAlignment="Center"
+                                                       Margin="0,0,4,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                                       FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                <Button Content="-" Style="{StaticResource SecondaryBtn}"
+                                                        FontSize="9" Padding="4,1"
+                                                        Click="BoostMinusBtn_Click"
+                                                        Tag="{Binding}"/>
+                                                <TextBlock Text="{Binding BoostPoints}"
+                                                           FontSize="11" FontWeight="SemiBold"
+                                                           Width="16" TextAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{StaticResource PrimaryColor}"/>
+                                                <Button Content="+" Style="{StaticResource SecondaryBtn}"
+                                                        FontSize="9" Padding="4,1"
+                                                        Click="BoostPlusBtn_Click"
+                                                        Tag="{Binding}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </Grid>
 
                         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
@@ -327,6 +373,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
@@ -354,8 +401,26 @@
                                                         </TextBlock.Style>
                                                     </TextBlock>
                                                 </StackPanel>
+                                                <!-- Boost badges -->
+                                                <ItemsControl Grid.Column="3" ItemsSource="{Binding Boosts}"
+                                                              VerticalAlignment="Center" Margin="4,0,0,0">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#EEF2FF" CornerRadius="3"
+                                                                    Padding="3,1" Margin="0,0,3,0">
+                                                                <TextBlock FontSize="9" Foreground="#4F46E5"
+                                                                           Text="{Binding Points, StringFormat='+{0}'}"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                                 <!-- Finish button (LongTerm only) -->
-                                                <Button Grid.Column="3" Content="✓ Done"
+                                                <Button Grid.Column="4" Content="✓ Done"
                                                         FontSize="9" Padding="5,2"
                                                         Margin="4,0,0,0"
                                                         Click="FinishTaskBtn_Click"
@@ -377,7 +442,7 @@
                                                         </Style>
                                                     </Button.Style>
                                                 </Button>
-                                                <Button Grid.Column="4" Content="✕"
+                                                <Button Grid.Column="5" Content="✕"
                                                         Style="{StaticResource SecondaryBtn}"
                                                         FontSize="10" Padding="4,2"
                                                         Margin="4,0,0,0"
@@ -475,6 +540,7 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{Binding Icon}"
                                                            FontSize="12" VerticalAlignment="Center"
@@ -487,12 +553,19 @@
                                                         <Run Text="{Binding Points, StringFormat='{}Points: {0}'}"/>
                                                     </TextBlock>
                                                 </StackPanel>
-                                                <Button Grid.Column="2" Content="+"
+                                                <Button Grid.Column="2" Content="✎"
+                                                        Style="{StaticResource SecondaryBtn}"
+                                                        FontSize="9" Padding="4,1"
+                                                        Margin="2,0,0,0"
+                                                        Click="EditAbilityBtn_Click"
+                                                        Tag="{Binding}"
+                                                        ToolTip="Rename ability"/>
+                                                <Button Grid.Column="3" Content="+"
                                                         Style="{StaticResource SecondaryBtn}"
                                                         FontSize="9" Padding="4,1"
                                                         Click="AbilityAddPointBtn_Click"
                                                         Tag="{Binding}"/>
-                                                <Button Grid.Column="3" Content="✕"
+                                                <Button Grid.Column="4" Content="✕"
                                                         Style="{StaticResource SecondaryBtn}"
                                                         FontSize="9" Padding="4,1"
                                                         Margin="2,0,0,0"
@@ -648,7 +721,7 @@
         <Border Grid.Row="2" Margin="0,12,0,0"
                 Background="{DynamicResource BgCard}" CornerRadius="8"
                 BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
-                Padding="12,8">
+                Padding="12,8" Grid.ColumnSpan="2">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>

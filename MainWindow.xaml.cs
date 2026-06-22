@@ -17,6 +17,13 @@ using WpfApp1.Views;
 
 namespace WpfApp1;
 
+public class BoostSelectorItem
+{
+    public string Name { get; set; } = "";
+    public string Icon { get; set; } = "";
+    public int BoostPoints { get; set; }
+}
+
 public partial class MainWindow : Window
 {
     private ObservableCollection<AppWhitelistEntry> _appWhitelist = new();
@@ -24,6 +31,7 @@ public partial class MainWindow : Window
     private ObservableCollection<TodoItem> _todoList = new();
     private ObservableCollection<TodoItem> _archivedTasks = new();
     private ObservableCollection<Ability> _abilities = new();
+    private ObservableCollection<BoostSelectorItem> _boostItems = new();
     private TodoType _taskType = TodoType.ShortTerm;
     private FocusSessionManager? _session;
     private DispatcherTimer? _uiTimer;
@@ -623,14 +631,26 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(text)) return;
 
         var today = DateTime.Today.ToString("yyyy-MM-dd");
+        var boosts = _boostItems
+            .Where(b => b.BoostPoints > 0)
+            .Select(b => new AbilityBoost { AbilityName = b.Name, Points = b.BoostPoints })
+            .ToList();
+
         _todoList.Add(new TodoItem
         {
             Text = text,
             Type = _taskType,
-            LastResetDate = today
+            LastResetDate = today,
+            Boosts = boosts
         });
         WhitelistStore.SaveTodoList(_todoList);
         TodoList.Items.Refresh();
+
+        // Reset boost selections
+        _boostItems.Clear();
+        BoostSelector.Visibility = Visibility.Collapsed;
+        UpdateTaskTypeButtons();
+
         NewTaskBox.Text = "";
         UpdateCurrentTaskLabel();
     }
@@ -646,6 +666,78 @@ public partial class MainWindow : Window
                 _ => TodoType.ShortTerm
             };
             UpdateTaskTypeButtons();
+        }
+    }
+
+    private void BoostToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var visible = BoostSelector.Visibility == Visibility.Visible;
+        BoostSelector.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+        if (!visible)
+        {
+            _boostItems.Clear();
+            foreach (var ab in _abilities)
+                _boostItems.Add(new BoostSelectorItem { Name = ab.Name, Icon = ab.Icon });
+            BoostSelector.ItemsSource = _boostItems;
+        }
+    }
+
+    private void BoostPlusBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is BoostSelectorItem item)
+        {
+            item.BoostPoints++;
+            BoostSelector.ItemsSource = null;
+            BoostSelector.ItemsSource = _boostItems;
+        }
+    }
+
+    private void BoostMinusBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is BoostSelectorItem item)
+        {
+            if (item.BoostPoints > 0) item.BoostPoints--;
+            BoostSelector.ItemsSource = null;
+            BoostSelector.ItemsSource = _boostItems;
+        }
+    }
+
+    private void EditAbilityBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is Ability ab)
+        {
+            var zh = LocaleManager.Current == Locale.ZH;
+            var input = ShowInputDialog(
+                zh ? "重命名属性" : "Rename Ability",
+                zh ? $"输入 {ab.Name} 的新名称：" : $"Enter new name for {ab.Name}:");
+            if (!string.IsNullOrWhiteSpace(input))
+            {
+                var newName = input.Trim();
+                // Update boosts in all tasks referencing old name
+                foreach (var task in _todoList)
+                {
+                    foreach (var boost in task.Boosts)
+                    {
+                        if (boost.AbilityName == ab.Name)
+                            boost.AbilityName = newName;
+                    }
+                }
+                foreach (var task in _archivedTasks)
+                {
+                    foreach (var boost in task.Boosts)
+                    {
+                        if (boost.AbilityName == ab.Name)
+                            boost.AbilityName = newName;
+                    }
+                }
+                ab.Name = newName;
+                WhitelistStore.SaveAbilities(_abilities);
+                WhitelistStore.SaveTodoList(_todoList);
+                WhitelistStore.SaveArchive(_archivedTasks);
+                AbilityList.Items.Refresh();
+                TodoList.Items.Refresh();
+                DrawRadarChart();
+            }
         }
     }
 
@@ -691,30 +783,20 @@ public partial class MainWindow : Window
     private void TaskCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         if (sender is not CheckBox cb || cb.DataContext is not TodoItem task) return;
-        if (!task.IsCompleted) return; // only handle check→complete, not uncheck
+        if (!task.IsCompleted) return;
 
-        // Show points dialog
-        var result = ShowPointsDialog(task);
-        if (result == null)
+        // Auto-apply preset boosts
+        foreach (var boost in task.Boosts)
         {
-            // User cancelled — undo the check
-            task.IsCompleted = false;
-            cb.IsChecked = false;
-            return;
+            var ab = _abilities.FirstOrDefault(a => a.Name == boost.AbilityName);
+            if (ab != null) ab.Points += boost.Points;
         }
-
-        // Apply points to abilities
-        foreach (var (ability, pts) in result)
+        if (task.Boosts.Count > 0)
         {
-            if (pts > 0)
-            {
-                var ab = _abilities.FirstOrDefault(a => a.Name == ability.Name);
-                if (ab != null) ab.Points += pts;
-            }
+            WhitelistStore.SaveAbilities(_abilities);
+            AbilityList.Items.Refresh();
+            DrawRadarChart();
         }
-        WhitelistStore.SaveAbilities(_abilities);
-        AbilityList.Items.Refresh();
-        DrawRadarChart();
 
         // Archive completed short-term tasks
         if (task.Type == TodoType.ShortTerm)
@@ -842,149 +924,6 @@ public partial class MainWindow : Window
             Canvas.SetTop(dot, py - 3);
             canvas.Children.Add(dot);
         }
-    }
-
-    private List<(Ability ability, int points)>? ShowPointsDialog(TodoItem task)
-    {
-        if (_abilities.Count == 0) return new List<(Ability, int)>();
-
-        var zh = LocaleManager.Current == Locale.ZH;
-        var dialog = new Window
-        {
-            Title = zh ? "任务完成！分配属性点" : "Task Complete! Assign Points",
-            Width = 380,
-            Height = 280 + _abilities.Count * 36,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner = this,
-            ResizeMode = ResizeMode.NoResize,
-            WindowStyle = WindowStyle.ToolWindow,
-            ShowInTaskbar = false,
-            Background = _settings.IsDarkMode
-                ? new SolidColorBrush(ParseColor("#1F2937"))
-                : new SolidColorBrush(ParseColor("#FFFFFF"))
-        };
-
-        var grid = new Grid { Margin = new Thickness(16) };
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var taskLabel = new TextBlock
-        {
-            Text = (zh ? "完成任务：" : "Task: ") + task.Text,
-            FontSize = 14, FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 6),
-            Foreground = new SolidColorBrush(ParseColor(_settings.IsDarkMode ? "#F9FAFB" : "#1F2937"))
-        };
-        Grid.SetRow(taskLabel, 0);
-        grid.Children.Add(taskLabel);
-
-        var hintLabel = new TextBlock
-        {
-            Text = zh ? "选择要提升的属性：" : "Select abilities to improve:",
-            FontSize = 12, Margin = new Thickness(0, 0, 0, 10),
-            Foreground = new SolidColorBrush(ParseColor(_settings.IsDarkMode ? "#9CA3AF" : "#6B7280"))
-        };
-        Grid.SetRow(hintLabel, 1);
-        grid.Children.Add(hintLabel);
-
-        // Ability rows with slider/buttons
-        var abilitiesPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-        var pointSelectors = new Dictionary<Ability, Slider>();
-        var pointLabels = new Dictionary<Ability, TextBlock>();
-
-        foreach (var ab in _abilities)
-        {
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
-
-            var nameLabel = new TextBlock
-            {
-                Text = $"{ab.Icon} {ab.Name}",
-                FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(ParseColor(_settings.IsDarkMode ? "#F9FAFB" : "#1F2937"))
-            };
-            Grid.SetColumn(nameLabel, 0);
-            row.Children.Add(nameLabel);
-
-            var slider = new Slider
-            {
-                Minimum = 0, Maximum = 5, Value = 0,
-                TickFrequency = 1, IsSnapToTickEnabled = true,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 0, 4, 0)
-            };
-            Grid.SetColumn(slider, 1);
-            row.Children.Add(slider);
-
-            var valLabel = new TextBlock
-            {
-                Text = "0", FontSize = 13, FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Foreground = new SolidColorBrush(ParseColor("#6366F1"))
-            };
-            Grid.SetColumn(valLabel, 2);
-            row.Children.Add(valLabel);
-
-            slider.ValueChanged += (_, _) =>
-            {
-                valLabel.Text = ((int)slider.Value).ToString();
-            };
-
-            pointSelectors[ab] = slider;
-            pointLabels[ab] = valLabel;
-            abilitiesPanel.Children.Add(row);
-        }
-        Grid.SetRow(abilitiesPanel, 2);
-        grid.Children.Add(abilitiesPanel);
-
-        // Buttons
-        var btnPanel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-        Grid.SetRow(btnPanel, 3);
-
-        var skipBtn = new Button
-        {
-            Content = zh ? "跳过" : "Skip",
-            Padding = new Thickness(16, 6, 16, 6),
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        skipBtn.Click += (_, _) => { dialog.DialogResult = true; dialog.Tag = "skip"; dialog.Close(); };
-        btnPanel.Children.Add(skipBtn);
-
-        var okBtn = new Button
-        {
-            Content = zh ? "✓ 确认" : "✓ Confirm",
-            Padding = new Thickness(16, 6, 16, 6),
-            Background = new SolidColorBrush(ParseColor("#6366F1")),
-            Foreground = Brushes.White,
-            FontWeight = FontWeights.SemiBold,
-            BorderThickness = new Thickness(0)
-        };
-        okBtn.Click += (_, _) => { dialog.DialogResult = true; dialog.Tag = "ok"; dialog.Close(); };
-        btnPanel.Children.Add(okBtn);
-
-        grid.Children.Add(btnPanel);
-        dialog.Content = grid;
-
-        if (dialog.ShowDialog() != true || dialog.Tag as string != "ok")
-            return null;
-
-        // Collect results
-        var results = new List<(Ability, int)>();
-        foreach (var ab in _abilities)
-        {
-            int pts = (int)(pointSelectors[ab]?.Value ?? 0);
-            if (pts > 0) results.Add((ab, pts));
-        }
-        return results;
     }
 
     private void NewAbilityBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
